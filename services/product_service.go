@@ -69,11 +69,20 @@ func (service *productServiceImpl) GetById(id uint, user_id uint) (models.Produc
 	response.HargaKonsumen = product.HargaKonsumen
 	response.Stok = product.Stok
 	response.Deskripsi = product.Deskripsi
+
+	// Store data with timestamps
 	response.Store.ID = product.Store.ID
 	response.Store.NamaToko = product.Store.NamaToko
 	response.Store.UrlFoto = product.Store.UrlFoto
+	response.Store.CreatedAt = product.Store.CreatedAt
+	response.Store.UpdatedAt = product.Store.UpdatedAt
+
+	// Category data with timestamps
 	response.Category.ID = product.Category.ID
 	response.Category.NamaCategory = product.Category.NamaCategory
+	response.Category.CreatedAt = product.Category.CreatedAt
+	response.Category.UpdatedAt = product.Category.UpdatedAt
+
 	response.CreatedAt = product.CreatedAt
 	response.UpdatedAt = product.UpdatedAt
 
