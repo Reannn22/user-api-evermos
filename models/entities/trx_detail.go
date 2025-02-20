@@ -8,16 +8,17 @@ import (
 
 type TrxDetail struct {
 	gorm.Model
-	ID          uint `gorm:"primaryKey"`
-	IDTrx       uint `gorm:"not null"`
-	IDLogProduk uint `gorm:"not null"`
-	IDToko      uint `gorm:"not null"`
-	Kuantitas   int  `gorm:"not null"`
-	HargaTotal  int  `gorm:"not null"`
-	CreatedAt   *time.Time
-	UpdatedAt   *time.Time
-	Store       Store      `gorm:"foreignKey:IDToko"`
+	IDTrx       uint       `gorm:"column:id_trx"`
+	IDLogProduk uint       `gorm:"column:id_log_produk"`
+	IDToko      uint       `gorm:"column:id_toko"`
+	Kuantitas   int        `gorm:"column:kuantitas"`
+	HargaTotal  int        `gorm:"column:harga_total"`
+	Trx         Trx        `gorm:"foreignKey:IDTrx"`
 	ProductLog  ProductLog `gorm:"foreignKey:IDLogProduk"`
+	Store       Store      `gorm:"foreignKey:IDToko"`
+	CreatedAt   *time.Time `json:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at"`
+	DeletedAt   *time.Time `json:"deleted_at" gorm:"index"`
 }
 
 func (TrxDetail) TableName() string {

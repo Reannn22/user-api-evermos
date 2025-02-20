@@ -28,6 +28,23 @@ func main() {
 	// Setup Database
 	database := configs.NewMysqlDatabase(configuration)
 
+	// Debug database connection
+	sqlDB, err := database.DB()
+	if err != nil {
+		log.Fatalf("Failed to get database instance: %v", err)
+	}
+
+	// Test connection
+	err = sqlDB.Ping()
+	if err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+
+	// Show tables
+	var tables []string
+	database.Raw("SHOW TABLES").Scan(&tables)
+	fmt.Println("Available tables:", tables)
+
 	// Setup Migration
 	migration.Migration(database)
 
@@ -135,7 +152,7 @@ func main() {
 
 	log.Printf("Server is running in the %s.", host)
 	log.Println("Press Ctrl + C to exit the server!")
-	err := app.Listen(host)
+	err = app.Listen(host)
 	if err != nil {
 		log.Printf("Error in running the server: %v.", err)
 	}

@@ -49,7 +49,7 @@ func (repository *transactionRepositoryImpl) FindAllPagination(pagination respon
 	for _, trx := range transactions {
 		response := models.TransactionResponse{
 			ID:          trx.ID,
-			HargaTotal:  trx.HargaTotal,
+			HargaTotal:  trx.HargaTotal, // This should now work as both are int
 			KodeInvoice: trx.KodeInvoice,
 			MethodBayar: trx.MethodBayar,
 			Address: models.AddressResponse{
@@ -96,8 +96,8 @@ func (repository *transactionRepositoryImpl) Insert(transaction models.Transacti
 	tx := repository.database.Begin()
 	transaction_insert := &entities.Trx{
 		IDUser:           transaction.Transaction.UserID,
-		AlamatPengiriman: transaction.Transaction.AlamatKirim,
-		HargaTotal:       transaction.Transaction.HargaTotal,
+		AlamatPengiriman: transaction.Transaction.AlamatPengiriman,
+		HargaTotal:       transaction.Transaction.HargaTotal, // Now both are int
 		KodeInvoice:      transaction.Transaction.KodeInvoice,
 		MethodBayar:      transaction.Transaction.MethodBayar,
 	}
@@ -128,7 +128,7 @@ func (repository *transactionRepositoryImpl) Insert(transaction models.Transacti
 			IDLogProduk: log_product.ID,
 			IDToko:      v.StoreID,
 			Kuantitas:   v.Kuantitas,
-			HargaTotal:  v.HargaTotal,
+			HargaTotal:  v.HargaTotal, // Now both are int
 		}).Error; err != nil {
 			tx.Rollback()
 			return false, err

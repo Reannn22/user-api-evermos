@@ -4,9 +4,9 @@ import "time"
 
 // Request
 type TransactionRequest struct {
-	MethodBayar string                     `json:"method_bayar"`
-	AlamatKirim uint                       `json:"alamat_kirim"`
-	DetailTrx   []TransactionDetailRequest `json:"detail_trx"`
+	MethodBayar      string                     `json:"method_bayar"`
+	AlamatPengiriman uint                       `json:"alamat_kirim"` // Changed from AlamatKirim
+	DetailTrx        []TransactionDetailRequest `json:"detail_trx"`
 }
 
 // Response
@@ -22,11 +22,11 @@ type TransactionResponse struct {
 }
 
 type TransactionProcess struct {
-	MethodBayar string
-	KodeInvoice string
-	AlamatKirim uint
-	UserID      uint
-	HargaTotal  int
+	MethodBayar      string
+	KodeInvoice      string
+	AlamatPengiriman uint
+	UserID           uint
+	HargaTotal       int
 }
 
 type TransactionProcessData struct {

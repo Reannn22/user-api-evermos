@@ -19,6 +19,8 @@ type AddressResponse struct {
 	NamaPenerima string     `json:"nama_penerima"`
 	NoTelp       string     `json:"no_telp"`
 	DetailAlamat string     `json:"detail_alamat"`
+	IDProvinsi   string     `json:"id_provinsi,omitempty"`
+	IDKota       string     `json:"id_kota,omitempty"`
 	CreatedAt    *time.Time `json:"created_at"`
 	UpdatedAt    *time.Time `json:"updated_at"`
 }

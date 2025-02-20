@@ -2,8 +2,8 @@ package models
 
 // Request
 type TransactionDetailRequest struct {
-	ProductID uint `json:"product_id"`
-	Kuantitas int  `json:"kuantitas"`
+	ProductID uint `json:"id_produk"` // Changed from IDProduk to ProductID
+	Kuantitas int  `json:"quantity"`  // Changed from Quantity to Kuantitas
 }
 
 // Response

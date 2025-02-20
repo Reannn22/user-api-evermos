@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"fmt"
 	"math"
 	"mini-project-evermos/models"
 	"mini-project-evermos/models/entities"
@@ -108,15 +109,29 @@ func (repository *productRepositoryImpl) FindAllPagination(request responder.Pag
 
 func (repository *productRepositoryImpl) FindById(id uint) (entities.Product, error) {
 	var product entities.Product
-	err := repository.database.
-		Preload("Store").
-		Preload("Category").
-		Preload("ProductPicture").
-		Where("id = ?", id).First(&product).Error
 
-	if err != nil {
-		return product, err
+	fmt.Printf("Looking for product with ID: %d in table: %s\n", id, entities.Product{}.TableName())
+
+	result := repository.database.Debug().
+		Table(entities.Product{}.TableName()).
+		Preload("Store", func(db *gorm.DB) *gorm.DB {
+			return db.Table("toko") // explicitly use toko table
+		}).
+		Preload("Category", func(db *gorm.DB) *gorm.DB {
+			return db.Table("category") // explicitly use category table
+		}).
+		Preload("ProductPicture", func(db *gorm.DB) *gorm.DB {
+			return db.Table("foto_produk") // explicitly use foto_produk table
+		}).
+		Where("id = ?", id).
+		First(&product)
+
+	if result.Error != nil {
+		fmt.Printf("Database error: %v\n", result.Error)
+		return entities.Product{}, fmt.Errorf("product with ID %d not found: %v", id, result.Error)
 	}
+
+	fmt.Printf("Found product: %+v\n", product)
 	return product, nil
 }
 

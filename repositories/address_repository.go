@@ -39,14 +39,16 @@ func (repository *addressRepositoryImpl) FindByUserId(id uint) ([]entities.Addre
 func (repository *addressRepositoryImpl) FindById(id uint) (entities.Address, error) {
 	var address entities.Address
 
-	// Debug print
-	fmt.Printf("Finding address with ID: %d\n", id)
+	fmt.Printf("Looking for address with ID: %d in table: %s\n", id, entities.Address{}.TableName())
 
-	err := repository.database.Where("id = ?", id).First(&address).Error
+	result := repository.database.Debug().
+		Table(entities.Address{}.TableName()).
+		Where("id = ? AND deleted_at IS NULL", id).
+		First(&address)
 
-	if err != nil {
-		fmt.Printf("Error finding address: %v\n", err)
-		return address, err
+	if result.Error != nil {
+		fmt.Printf("Database error: %v\n", result.Error)
+		return entities.Address{}, fmt.Errorf("address with ID %d not found", id)
 	}
 
 	fmt.Printf("Found address: %+v\n", address)

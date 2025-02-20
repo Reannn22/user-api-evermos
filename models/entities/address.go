@@ -8,19 +8,19 @@ import (
 
 type Address struct {
 	gorm.Model
-	ID           uint   `gorm:"primaryKey"`
-	IDUser       uint   `gorm:"not null"`
-	JudulAlamat  string `gorm:"size:255;not null"`
-	NamaPenerima string `gorm:"size:255;not null"`
-	NoTelp       string `gorm:"size:255;not null"`
-	DetailAlamat string `gorm:"type:text;not null"`
-	IDProvinsi   string `gorm:"size:255;not null"`
-	IDKota       string `gorm:"size:255;not null"`
-	CreatedAt    *time.Time
-	UpdatedAt    *time.Time
-	User         User `gorm:"foreignKey:IDUser"`
+	ID           uint           `json:"id" gorm:"primaryKey;autoIncrement;column:id"`
+	JudulAlamat  string         `json:"judul_alamat" gorm:"column:judul_alamat"`
+	NamaPenerima string         `json:"nama_penerima" gorm:"column:nama_penerima"`
+	NoTelp       string         `json:"no_telp" gorm:"column:no_telp"`
+	DetailAlamat string         `json:"detail_alamat" gorm:"column:detail_alamat"`
+	IDUser       uint           `json:"id_user" gorm:"column:id_user"`
+	IDProvinsi   string         `json:"id_provinsi" gorm:"column:id_provinsi"`
+	IDKota       string         `json:"id_kota" gorm:"column:id_kota"`
+	CreatedAt    *time.Time     `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt    *time.Time     `json:"updated_at" gorm:"column:updated_at"`
+	DeletedAt    gorm.DeletedAt `json:"deleted_at" gorm:"column:deleted_at"`
 }
 
 func (Address) TableName() string {
-	return "address"
+	return "alamat"
 }

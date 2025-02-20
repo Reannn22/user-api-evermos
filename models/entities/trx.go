@@ -8,17 +8,16 @@ import (
 
 type Trx struct {
 	gorm.Model
-	ID               uint   `gorm:"primaryKey"`
-	IDUser           uint   `gorm:"not null"`
-	AlamatPengiriman uint   `gorm:"not null"`
-	HargaTotal       int    `gorm:"not null"`
-	KodeInvoice      string `gorm:"size:255;not null"`
-	MethodBayar      string `gorm:"size:255;not null"`
-	CreatedAt        *time.Time
-	UpdatedAt        *time.Time
-	Address          Address     `gorm:"foreignKey:AlamatPengiriman"`
-	User             User        `gorm:"foreignKey:IDUser"`
+	KodeInvoice      string      `gorm:"column:kode_invoice"`
+	MethodBayar      string      `gorm:"column:method_bayar"`
+	AlamatPengiriman uint        `gorm:"column:alamat_pengiriman"`
+	IDUser           uint        `gorm:"column:id_user"`
+	HargaTotal       int         `gorm:"column:harga_total"`
+	Address          Address     `gorm:"foreignKey:AlamatPengiriman;references:ID"`
 	TrxDetail        []TrxDetail `gorm:"foreignKey:IDTrx"`
+	CreatedAt        *time.Time  `json:"created_at"`
+	UpdatedAt        *time.Time  `json:"updated_at"`
+	DeletedAt        *time.Time  `json:"deleted_at" gorm:"index"`
 }
 
 func (Trx) TableName() string {

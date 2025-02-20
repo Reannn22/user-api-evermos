@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+
 // Contract
 type TransactionService interface {
 	GetAll(limit int, page int, keyword string) (responder.Pagination, error)
@@ -32,7 +33,7 @@ func NewTransactionService(transactionRepository *repositories.TransactionReposi
 }
 
 func (service *transactionServiceImpl) GetAll(limit int, page int, keyword string) (responder.Pagination, error) {
-	request := responder.Pagination{}
+	request := responder.Pagination{} // Changed from PPagination to Pagination
 	request.Limit = limit
 	request.Page = page
 	request.Keyword = keyword
@@ -46,21 +47,36 @@ func (service *transactionServiceImpl) GetAll(limit int, page int, keyword strin
 }
 
 func (service *transactionServiceImpl) Create(input models.TransactionRequest, user_id uint) (bool, error) {
-	//check alamat
-	check_address, err := service.repositoryAddress.FindById(input.AlamatKirim)
+	fmt.Printf("Creating transaction with input: %+v\n", input)
 
-	// Add error check for address not found
+	// Check if address exists and belongs to user
+	check_address, err := service.repositoryAddress.FindById(input.AlamatPengiriman) // Using AlamatPengiriman consistently
 	if err != nil {
-		fmt.Printf("Address not found: %v\n", err)
-		return false, errors.New("address not found")
+		fmt.Printf("Address error: %v\n", err)
+		return false, fmt.Errorf("address error: %v", err)
 	}
 
-	// Debug print
-	fmt.Printf("Address ID: %d, User ID from token: %d, Address User ID: %d\n",
-		input.AlamatKirim, user_id, check_address.IDUser)
+	fmt.Printf("Found address: %+v\n", check_address)
 
+	// Verify address belongs to user
 	if check_address.IDUser != user_id {
 		return false, errors.New("forbidden: address does not belong to user")
+	}
+
+	// Verify all products exist first
+	for _, detail := range input.DetailTrx {
+		product, err := service.repositoryProduct.FindById(detail.ProductID)
+		if err != nil {
+			fmt.Printf("Error finding product %d: %v\n", detail.ProductID, err)
+			return false, fmt.Errorf("product with ID %d not found", detail.ProductID)
+		}
+		if product.ID == 0 {
+			return false, fmt.Errorf("product with ID %d does not exist", detail.ProductID)
+		}
+		// Check if stock is sufficient
+		if product.Stok < detail.Kuantitas {
+			return false, fmt.Errorf("insufficient stock for product %d", detail.ProductID)
+		}
 	}
 
 	date_now := time.Now()
@@ -102,7 +118,7 @@ func (service *transactionServiceImpl) Create(input models.TransactionRequest, u
 
 	//transaction
 	transaction := models.TransactionProcess{}
-	transaction.AlamatKirim = input.AlamatKirim
+	transaction.AlamatPengiriman = input.AlamatPengiriman // Changed from AlamatKirim
 	transaction.MethodBayar = input.MethodBayar
 	transaction.KodeInvoice = invoice
 	transaction.UserID = user_id

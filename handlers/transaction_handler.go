@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"mini-project-evermos/exceptions"
 	"mini-project-evermos/middleware"
 	"mini-project-evermos/models"
@@ -29,30 +30,25 @@ func (handler *TransactionHandler) Route(app *fiber.App) {
 }
 
 func (handler *TransactionHandler) GetAllTransaction(c *fiber.Ctx) error {
-	limit, err := strconv.Atoi(c.FormValue("limit"))
+	// Default values
+	defaultLimit := 10
+	defaultPage := 1
+
+	// Try to get limit from query param, use default if not provided
+	limit, err := strconv.Atoi(c.FormValue("limit", strconv.Itoa(defaultLimit)))
 	if err != nil {
-		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
-			Status:  false,
-			Message: "Failed to GET data",
-			Error:   exceptions.NewString("limit required."),
-			Data:    nil,
-		})
+		limit = defaultLimit
 	}
 
-	page, err := strconv.Atoi(c.FormValue("page"))
+	// Try to get page from query param, use default if not provided
+	page, err := strconv.Atoi(c.FormValue("page", strconv.Itoa(defaultPage)))
 	if err != nil {
-		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
-			Status:  false,
-			Message: "Failed to GET data",
-			Error:   exceptions.NewString("page required."),
-			Data:    nil,
-		})
+		page = defaultPage
 	}
 
-	keyword := c.FormValue("search")
+	keyword := c.FormValue("search", "")
 
 	responses, err := handler.TransactionService.GetAll(limit, page, keyword)
-
 	if err != nil {
 		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
@@ -114,10 +110,12 @@ func (handler *TransactionHandler) DetailTransaction(c *fiber.Ctx) error {
 }
 
 func (handler *TransactionHandler) CreateTransaction(c *fiber.Ctx) error {
-	//claim
+	// Debug incoming request
+	fmt.Println("=== Transaction Create Request ===")
+
 	claims, err := jwt.ExtractTokenMetadata(c)
 	if err != nil {
-		// Return status 500 and JWT parse error.
+		fmt.Printf("JWT Error: %v\n", err)
 		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
 			Message: "Failed to POST data",
@@ -125,32 +123,33 @@ func (handler *TransactionHandler) CreateTransaction(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
-
-	user_id := claims.UserId
+	fmt.Printf("User ID from token: %d\n", claims.UserId)
 
 	var input models.TransactionRequest
-
 	err = c.BodyParser(&input)
 	if err != nil {
+		fmt.Printf("Body Parse Error: %v\n", err)
 		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
-			Message: "Failed to POST data",
+			Message: "Failed to parse request body",
 			Error:   exceptions.NewString(err.Error()),
 			Data:    nil,
 		})
 	}
 
-	response, err := handler.TransactionService.Create(input, uint(user_id))
+	fmt.Printf("Parsed Input: %+v\n", input)
 
+	response, err := handler.TransactionService.Create(input, uint(claims.UserId))
 	if err != nil {
-		//error
-		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+		fmt.Printf("Service Error: %v\n", err)
+		return c.Status(http.StatusNotFound).JSON(responder.ApiResponse{
 			Status:  false,
-			Message: "Failed to POST data",
+			Message: "NOT FOUND",
 			Error:   exceptions.NewString(err.Error()),
 			Data:    nil,
 		})
 	}
+
 	return c.Status(http.StatusOK).JSON(responder.ApiResponse{
 		Status:  true,
 		Message: "Succeed to POST data",
