@@ -27,6 +27,8 @@ func (handler *TransactionHandler) Route(app *fiber.App) {
 	routes.Get("/", middleware.JWTProtected(), handler.GetAllTransaction)
 	routes.Get("/:id", middleware.JWTProtected(), handler.DetailTransaction)
 	routes.Post("/", middleware.JWTProtected(), handler.CreateTransaction)
+	routes.Put("/:id", middleware.JWTProtected(), handler.UpdateTransaction)
+	routes.Delete("/:id", middleware.JWTProtected(), handler.DeleteTransaction)
 }
 
 func (handler *TransactionHandler) GetAllTransaction(c *fiber.Ctx) error {
@@ -67,19 +69,15 @@ func (handler *TransactionHandler) GetAllTransaction(c *fiber.Ctx) error {
 }
 
 func (handler *TransactionHandler) DetailTransaction(c *fiber.Ctx) error {
-	//claim
 	claims, err := jwt.ExtractTokenMetadata(c)
 	if err != nil {
-		// Return status 500 and JWT parse error.
-		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+		return c.Status(http.StatusUnauthorized).JSON(responder.ApiResponse{
 			Status:  false,
-			Message: "Failed to POST data",
+			Message: "Unauthorized",
 			Error:   exceptions.NewString(err.Error()),
 			Data:    nil,
 		})
 	}
-
-	user_id := claims.UserId
 
 	id, err := c.ParamsInt("id")
 	if err != nil {
@@ -91,9 +89,16 @@ func (handler *TransactionHandler) DetailTransaction(c *fiber.Ctx) error {
 		})
 	}
 
-	response, err := handler.TransactionService.GetById(uint(id), uint(user_id))
+	response, err := handler.TransactionService.GetById(uint(id), uint(claims.UserId))
 	if err != nil {
-		//error
+		if err.Error() == "record not found" {
+			return c.Status(http.StatusNotFound).JSON(responder.ApiResponse{
+				Status:  false,
+				Message: "Transaction not found",
+				Error:   exceptions.NewString(err.Error()),
+				Data:    nil,
+			})
+		}
 		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
 			Message: "Failed to GET data",
@@ -101,6 +106,7 @@ func (handler *TransactionHandler) DetailTransaction(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
+
 	return c.Status(http.StatusOK).JSON(responder.ApiResponse{
 		Status:  true,
 		Message: "Succeed to GET data",
@@ -155,5 +161,121 @@ func (handler *TransactionHandler) CreateTransaction(c *fiber.Ctx) error {
 		Message: "Succeed to POST data",
 		Error:   nil,
 		Data:    response,
+	})
+}
+
+func (handler *TransactionHandler) UpdateTransaction(c *fiber.Ctx) error {
+	claims, err := jwt.ExtractTokenMetadata(c)
+	if err != nil {
+		return c.Status(http.StatusUnauthorized).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Unauthorized",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	id, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Invalid ID parameter",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	var input models.TransactionUpdateRequest
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Failed to parse request body",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	response, err := handler.TransactionService.Update(uint(id), uint(claims.UserId), input)
+	if err != nil {
+		if err.Error() == "record not found" {
+			return c.Status(http.StatusNotFound).JSON(responder.ApiResponse{
+				Status:  false,
+				Message: "Transaction not found",
+				Error:   exceptions.NewString(err.Error()),
+				Data:    nil,
+			})
+		}
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Failed to update transaction",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(responder.ApiResponse{
+		Status:  true,
+		Message: "Transaction updated successfully",
+		Error:   nil,
+		Data:    response,
+	})
+}
+
+func (handler *TransactionHandler) DeleteTransaction(c *fiber.Ctx) error {
+	claims, err := jwt.ExtractTokenMetadata(c)
+	if err != nil {
+		return c.Status(http.StatusUnauthorized).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Unauthorized",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	id, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Invalid ID parameter",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	// Get transaction data before deletion
+	response, err := handler.TransactionService.GetById(uint(id), uint(claims.UserId))
+	if err != nil {
+		if err.Error() == "record not found" {
+			return c.Status(http.StatusNotFound).JSON(responder.ApiResponse{
+				Status:  false,
+				Message: "Transaction not found",
+				Error:   exceptions.NewString(err.Error()),
+				Data:    nil,
+			})
+		}
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Failed to get transaction",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	// Delete the transaction
+	err = handler.TransactionService.Delete(uint(id), uint(claims.UserId))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Failed to delete transaction",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(responder.ApiResponse{
+		Status:  true,
+		Message: "Transaction deleted successfully",
+		Error:   nil,
+		Data:    response, // Return the transaction data that was deleted
 	})
 }

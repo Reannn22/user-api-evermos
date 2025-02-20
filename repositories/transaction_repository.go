@@ -5,16 +5,15 @@ import (
 	"mini-project-evermos/models/entities"
 	"mini-project-evermos/models/responder"
 
-	"math"
-
 	"gorm.io/gorm"
 )
 
-// Contract
 type TransactionRepository interface {
 	FindAllPagination(pagination responder.Pagination) (responder.Pagination, error)
 	FindById(id uint) (entities.Trx, error)
-	Insert(transaction models.TransactionProcessData) (bool, error)
+	Insert(transaction models.TransactionProcessData) (uint, error)
+	Update(transaction entities.Trx) (entities.Trx, error)
+	Delete(id uint) error
 }
 
 type transactionRepositoryImpl struct {
@@ -33,9 +32,11 @@ func (repository *transactionRepositoryImpl) FindAllPagination(pagination respon
 	query.Count(&totalRows)
 
 	err := query.
-		Preload("User").
-		Preload("TrxDetail").
-		Preload("TrxDetail.ProductLog").
+		Preload("Address").
+		Preload("TrxDetail.ProductLog.Product").
+		Preload("TrxDetail.ProductLog.Product.Store").
+		Preload("TrxDetail.ProductLog.Product.Category").
+		Preload("TrxDetail.ProductLog.Product.ProductPicture").
 		Preload("TrxDetail.Store").
 		Limit(pagination.Limit).
 		Offset(pagination.GetOffset()).
@@ -49,25 +50,81 @@ func (repository *transactionRepositoryImpl) FindAllPagination(pagination respon
 	for _, trx := range transactions {
 		response := models.TransactionResponse{
 			ID:          trx.ID,
-			HargaTotal:  trx.HargaTotal, // This should now work as both are int
+			HargaTotal:  trx.HargaTotal,
 			KodeInvoice: trx.KodeInvoice,
 			MethodBayar: trx.MethodBayar,
+			CreatedAt:   trx.CreatedAt,
+			UpdatedAt:   trx.UpdatedAt,
 			Address: models.AddressResponse{
 				ID:           trx.Address.ID,
 				JudulAlamat:  trx.Address.JudulAlamat,
 				NamaPenerima: trx.Address.NamaPenerima,
 				NoTelp:       trx.Address.NoTelp,
 				DetailAlamat: trx.Address.DetailAlamat,
+				CreatedAt:    trx.Address.CreatedAt,
+				UpdatedAt:    trx.Address.UpdatedAt,
 			},
-			CreatedAt: trx.CreatedAt,
-			UpdatedAt: trx.UpdatedAt,
 		}
+
+		var details []models.TransactionDetailResponse
+		for _, detail := range trx.TrxDetail {
+			// Convert product pictures
+			var photos []models.ProductPictureResponse
+			for _, pic := range detail.ProductLog.Product.ProductPicture {
+				photos = append(photos, models.ProductPictureResponse{
+					ID:        pic.ID,
+					IDProduk:  pic.IDProduk,
+					Url:       pic.Url,
+					CreatedAt: pic.CreatedAt,
+					UpdatedAt: pic.UpdatedAt,
+				})
+			}
+
+			details = append(details, models.TransactionDetailResponse{
+				ID:         detail.ID,
+				Kuantitas:  detail.Kuantitas,
+				HargaTotal: detail.HargaTotal,
+				Store: models.StoreResponse{
+					ID:        detail.Store.ID,
+					NamaToko:  detail.Store.NamaToko,
+					UrlFoto:   detail.Store.UrlFoto,
+					CreatedAt: detail.Store.CreatedAt,
+					UpdatedAt: detail.Store.UpdatedAt,
+				},
+				Product: models.ProductResponse{
+					ID:            detail.ProductLog.Product.ID,
+					NamaProduk:    detail.ProductLog.Product.NamaProduk,
+					Slug:          detail.ProductLog.Product.Slug,
+					HargaReseller: detail.ProductLog.Product.HargaReseller,
+					HargaKonsumen: detail.ProductLog.Product.HargaKonsumen,
+					Stok:          detail.ProductLog.Product.Stok,
+					Deskripsi:     detail.ProductLog.Product.Deskripsi,
+					Store: models.StoreResponse{
+						ID:        detail.ProductLog.Product.Store.ID,
+						NamaToko:  detail.ProductLog.Product.Store.NamaToko,
+						UrlFoto:   detail.ProductLog.Product.Store.UrlFoto,
+						CreatedAt: detail.ProductLog.Product.Store.CreatedAt,
+						UpdatedAt: detail.ProductLog.Product.Store.UpdatedAt,
+					},
+					Category: models.CategoryResponse{
+						ID:           detail.ProductLog.Product.Category.ID,
+						NamaCategory: detail.ProductLog.Product.Category.NamaCategory,
+						CreatedAt:    detail.ProductLog.Product.Category.CreatedAt,
+						UpdatedAt:    detail.ProductLog.Product.Category.UpdatedAt,
+					},
+					Photos:    photos,
+					CreatedAt: detail.ProductLog.Product.CreatedAt,
+					UpdatedAt: detail.ProductLog.Product.UpdatedAt,
+				},
+			})
+		}
+		response.TransactionDetails = details
 		responses = append(responses, response)
 	}
 
 	pagination.Rows = responses
 	pagination.TotalRows = totalRows
-	pagination.TotalPages = int(math.Ceil(float64(totalRows) / float64(pagination.Limit)))
+	pagination.TotalPages = int((totalRows + int64(pagination.Limit) - 1) / int64(pagination.Limit))
 
 	return pagination, nil
 }
@@ -77,34 +134,31 @@ func (repository *transactionRepositoryImpl) FindById(id uint) (entities.Trx, er
 
 	err := repository.database.
 		Preload("Address").
-		Preload("TrxDetail").
-		Preload("TrxDetail.Store").
 		Preload("TrxDetail.ProductLog.Product").
 		Preload("TrxDetail.ProductLog.Product.Store").
 		Preload("TrxDetail.ProductLog.Product.Category").
 		Preload("TrxDetail.ProductLog.Product.ProductPicture").
-		Where("id = ?", id).First(&transaction).Error
+		Preload("TrxDetail.Store").
+		Where("id = ?", id).
+		First(&transaction).Error
 
-	if err != nil {
-		return transaction, err
-	}
-
-	return transaction, nil
+	return transaction, err
 }
 
-func (repository *transactionRepositoryImpl) Insert(transaction models.TransactionProcessData) (bool, error) {
+func (repository *transactionRepositoryImpl) Insert(transaction models.TransactionProcessData) (uint, error) {
 	tx := repository.database.Begin()
+
 	transaction_insert := &entities.Trx{
 		IDUser:           transaction.Transaction.UserID,
 		AlamatPengiriman: transaction.Transaction.AlamatPengiriman,
-		HargaTotal:       transaction.Transaction.HargaTotal, // Now both are int
+		HargaTotal:       transaction.Transaction.HargaTotal,
 		KodeInvoice:      transaction.Transaction.KodeInvoice,
 		MethodBayar:      transaction.Transaction.MethodBayar,
 	}
 
 	if err := tx.Create(transaction_insert).Error; err != nil {
 		tx.Rollback()
-		return false, err
+		return 0, err
 	}
 
 	for _, v := range transaction.LogProduct {
@@ -120,7 +174,7 @@ func (repository *transactionRepositoryImpl) Insert(transaction models.Transacti
 		}
 		if err := tx.Create(log_product).Error; err != nil {
 			tx.Rollback()
-			return false, err
+			return 0, err
 		}
 
 		if err := tx.Create(&entities.TrxDetail{
@@ -128,13 +182,22 @@ func (repository *transactionRepositoryImpl) Insert(transaction models.Transacti
 			IDLogProduk: log_product.ID,
 			IDToko:      v.StoreID,
 			Kuantitas:   v.Kuantitas,
-			HargaTotal:  v.HargaTotal, // Now both are int
+			HargaTotal:  v.HargaTotal,
 		}).Error; err != nil {
 			tx.Rollback()
-			return false, err
+			return 0, err
 		}
 	}
 
 	tx.Commit()
-	return true, nil
+	return transaction_insert.ID, nil
+}
+
+func (repository *transactionRepositoryImpl) Update(transaction entities.Trx) (entities.Trx, error) {
+	err := repository.database.Save(&transaction).Error
+	return transaction, err
+}
+
+func (repository *transactionRepositoryImpl) Delete(id uint) error {
+	return repository.database.Delete(&entities.Trx{}, id).Error
 }

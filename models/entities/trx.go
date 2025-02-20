@@ -13,8 +13,8 @@ type Trx struct {
 	AlamatPengiriman uint        `gorm:"column:alamat_pengiriman"`
 	IDUser           uint        `gorm:"column:id_user"`
 	HargaTotal       int         `gorm:"column:harga_total"`
-	Address          Address     `gorm:"foreignKey:AlamatPengiriman;references:ID"`
-	TrxDetail        []TrxDetail `gorm:"foreignKey:IDTrx"`
+	Address          Address     `gorm:"foreignKey:ID;references:AlamatPengiriman"`
+	TrxDetail        []TrxDetail `gorm:"foreignKey:IDTrx;references:ID"`
 	CreatedAt        *time.Time  `json:"created_at"`
 	UpdatedAt        *time.Time  `json:"updated_at"`
 	DeletedAt        *time.Time  `json:"deleted_at" gorm:"index"`
