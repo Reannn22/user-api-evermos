@@ -13,7 +13,8 @@ import (
 // Contract
 type UserService interface {
 	GetById(id uint) (models.UserResponse, error)
-	Edit(id uint, payload models.UserRequest) (bool, error)
+	Edit(id uint, payload models.UserRequest) (models.UserResponse, error) // Changed return type
+	Delete(id uint) (models.UserResponse, error)                           // Change return type
 }
 
 type userServiceImpl struct {
@@ -27,67 +28,160 @@ func NewUserService(userRepository *repositories.UserRepository) UserService {
 }
 
 func (service *userServiceImpl) GetById(id uint) (models.UserResponse, error) {
-	check_user, err := service.repository.FindById(id)
-
+	user, err := service.repository.FindById(id)
 	if err != nil {
 		return models.UserResponse{}, err
 	}
 
-	//get region
-	province, err := region.GetProvinceByID(check_user.IDProvinsi)
-	city, err := region.GetCityByID(check_user.IDKota)
+	// Get region data
+	province, _ := region.GetProvinceByID(user.IDProvinsi)
+	city, _ := region.GetCityByID(user.IDKota)
 
-	var response = models.UserResponse{}
-	response.Nama = check_user.Nama
-	response.NoTelp = check_user.Notelp
-	response.Tentang = check_user.Tentang
-	response.Pekerjaan = check_user.Pekerjaan
-	response.TanggalLahir = check_user.TanggalLahir.Format("02/01/2006")
-	response.Email = check_user.Email
-	response.IDProvinsi = province
-	response.IDKota = city
+	response := models.UserResponse{
+		ID:           user.ID,
+		Nama:         user.Nama,
+		KataSandi:    user.KataSandi,
+		Notelp:       user.Notelp,
+		TanggalLahir: user.TanggalLahir,
+		JenisKelamin: user.JenisKelamin,
+		Tentang:      user.Tentang,
+		Pekerjaan:    user.Pekerjaan,
+		Email:        user.Email,
+		IDProvinsi: models.ProvinceDetail{
+			ID:   user.IDProvinsi,
+			Name: province.Name,
+		},
+		IDKota: models.CityDetail{
+			ID:         user.IDKota,
+			ProvinceID: user.IDProvinsi,
+			Name:       city.Name,
+		},
+		IsAdmin:   user.IsAdmin,
+		CreatedAt: *user.CreatedAt,
+		UpdatedAt: *user.UpdatedAt,
+	}
 
 	return response, nil
 }
 
-func (service *userServiceImpl) Edit(id uint, payload models.UserRequest) (bool, error) {
-	//check
-	check_user, err := service.repository.FindById(id)
-
+func (service *userServiceImpl) Edit(id uint, payload models.UserRequest) (models.UserResponse, error) {
+	//check if user exists
+	_, err := service.repository.FindById(id)
 	if err != nil {
-		return false, err
+		return models.UserResponse{}, err
 	}
 
 	//encrypt pass
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(payload.KataSandi), bcrypt.MinCost)
 	if err != nil {
-		return false, err
+		return models.UserResponse{}, err
 	}
 
 	//string to date
 	date, err := time.Parse("02/01/2006", payload.TanggalLahir)
-
 	if err != nil {
-		return false, err
+		return models.UserResponse{}, err
 	}
 
 	//mapping
 	user := entities.User{}
 	user.Nama = payload.Nama
-	if check_user.Notelp != payload.NoTelp {
-		user.Notelp = payload.NoTelp
-	}
-	if check_user.Email != payload.Email {
-		user.Email = payload.Email
-	}
+	user.Notelp = payload.NoTelp
+	user.Email = payload.Email
 	user.KataSandi = string(passwordHash)
 	user.TanggalLahir = date
+	user.JenisKelamin = payload.JenisKelamin
+	user.Tentang = &payload.Tentang
 	user.Pekerjaan = payload.Pekerjaan
 	user.IDProvinsi = payload.IDProvinsi
 	user.IDKota = payload.IDKota
+	user.IsAdmin = payload.IsAdmin
 
 	//update
-	res, err := service.repository.Update(id, user)
+	_, err = service.repository.Update(id, user)
+	if err != nil {
+		return models.UserResponse{}, err
+	}
 
-	return res, err
+	// Get updated user data
+	updatedUser, err := service.repository.FindById(id)
+	if err != nil {
+		return models.UserResponse{}, err
+	}
+
+	// Get region data
+	province, _ := region.GetProvinceByID(updatedUser.IDProvinsi)
+	city, _ := region.GetCityByID(updatedUser.IDKota)
+
+	// Map to response
+	response := models.UserResponse{
+		ID:           updatedUser.ID,
+		Nama:         updatedUser.Nama,
+		KataSandi:    updatedUser.KataSandi,
+		Notelp:       updatedUser.Notelp,
+		TanggalLahir: updatedUser.TanggalLahir,
+		JenisKelamin: updatedUser.JenisKelamin,
+		Tentang:      updatedUser.Tentang,
+		Pekerjaan:    updatedUser.Pekerjaan,
+		Email:        updatedUser.Email,
+		IDProvinsi: models.ProvinceDetail{
+			ID:   updatedUser.IDProvinsi,
+			Name: province.Name,
+		},
+		IDKota: models.CityDetail{
+			ID:         updatedUser.IDKota,
+			ProvinceID: updatedUser.IDProvinsi,
+			Name:       city.Name,
+		},
+		IsAdmin:   updatedUser.IsAdmin,
+		CreatedAt: *updatedUser.CreatedAt,
+		UpdatedAt: *updatedUser.UpdatedAt,
+	}
+
+	return response, nil
+}
+
+func (service *userServiceImpl) Delete(id uint) (models.UserResponse, error) {
+	// Get user data before deletion
+	user, err := service.repository.FindById(id)
+	if err != nil {
+		return models.UserResponse{}, err
+	}
+
+	// Get region data
+	province, _ := region.GetProvinceByID(user.IDProvinsi)
+	city, _ := region.GetCityByID(user.IDKota)
+
+	// Create response before deleting
+	response := models.UserResponse{
+		ID:           user.ID,
+		Nama:         user.Nama,
+		KataSandi:    user.KataSandi,
+		Notelp:       user.Notelp,
+		TanggalLahir: user.TanggalLahir,
+		JenisKelamin: user.JenisKelamin,
+		Tentang:      user.Tentang,
+		Pekerjaan:    user.Pekerjaan,
+		Email:        user.Email,
+		IDProvinsi: models.ProvinceDetail{
+			ID:   user.IDProvinsi,
+			Name: province.Name,
+		},
+		IDKota: models.CityDetail{
+			ID:         user.IDKota,
+			ProvinceID: user.IDProvinsi,
+			Name:       city.Name,
+		},
+		IsAdmin:   user.IsAdmin,
+		CreatedAt: *user.CreatedAt,
+		UpdatedAt: *user.UpdatedAt,
+	}
+
+	// Delete the user
+	err = service.repository.Delete(id)
+	if err != nil {
+		return models.UserResponse{}, err
+	}
+
+	return response, nil
 }

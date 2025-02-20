@@ -8,28 +8,65 @@ type RegisterRequest struct {
 	KataSandi    string `json:"kata_sandi" binding:"required"`
 	NoTelp       string `json:"no_telp" binding:"required"`
 	TanggalLahir string `json:"tanggal_lahir" binding:"required"`
+	JenisKelamin string `json:"jenis_kelamin" binding:"required"`
+	Tentang      string `json:"tentang"` // Optional field
 	Pekerjaan    string `json:"pekerjaan" binding:"required"`
 	Email        string `json:"email" binding:"required"`
 	IDProvinsi   string `json:"id_provinsi" binding:"required"`
 	IDKota       string `json:"id_kota" binding:"required"`
+	IsAdmin      bool   `json:"is_admin"` // Optional field
 }
 
 type LoginRequest struct {
-	NoTelp    string `json:"no_telp" binding:"required"`
+	Email     string `json:"email" binding:"required"`
 	KataSandi string `json:"kata_sandi" binding:"required"`
+}
+
+type ProvinceDetail struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type CityDetail struct {
+	ID         string `json:"id"`
+	ProvinceID string `json:"province_id"`
+	Name       string `json:"name"`
 }
 
 // Response
 type LoginResponse struct {
-	Nama         string    `json:"nama"`
-	NoTelp       string    `json:"no_telp"`
-	TanggalLahir string    `json:"tanggal_lahir"`
-	Tentang      *string   `json:"tentang"`
-	Pekerjaan    string    `json:"pekerjaan"`
-	Email        string    `json:"email"`
-	IDProvinsi   *Province `json:"id_provinsi"`
-	IDKota       *City     `json:"id_kota"`
-	Token        string    `json:"token"`
+	ID           uint           `json:"id"`
+	Nama         string         `json:"nama"`
+	KataSandi    string         `json:"kata_sandi"`
+	NoTelp       string         `json:"no_telp"`
+	TanggalLahir string         `json:"tanggal_lahir"`
+	JenisKelamin string         `json:"jenis_kelamin"`
+	Tentang      *string        `json:"tentang"`
+	Pekerjaan    string         `json:"pekerjaan"`
+	Email        string         `json:"email"`
+	IDProvinsi   ProvinceDetail `json:"id_provinsi"`
+	IDKota       CityDetail     `json:"id_kota"`
+	IsAdmin      bool           `json:"is_admin"`
+	CreatedAt    string         `json:"created_at"`
+	UpdatedAt    string         `json:"updated_at"`
+	Token        string         `json:"token"`
+}
+
+type RegisterResponse struct {
+	ID           uint           `json:"id"`
+	Nama         string         `json:"nama"`
+	KataSandi    string         `json:"kata_sandi"`
+	NoTelp       string         `json:"no_telp"`       // Changed from notelp
+	TanggalLahir string         `json:"tanggal_lahir"` // Changed from time.Time
+	JenisKelamin string         `json:"jenis_kelamin"`
+	Tentang      *string        `json:"tentang"`
+	Pekerjaan    string         `json:"pekerjaan"`
+	Email        string         `json:"email"`
+	IDProvinsi   ProvinceDetail `json:"id_provinsi"` // Changed to ProvinceDetail
+	IDKota       CityDetail     `json:"id_kota"`     // Changed to CityDetail
+	IsAdmin      bool           `json:"is_admin"`
+	CreatedAt    string         `json:"created_at"` // Changed from time.Time
+	UpdatedAt    string         `json:"updated_at"` // Changed from time.Time
 }
 
 // process mapping

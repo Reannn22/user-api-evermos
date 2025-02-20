@@ -28,21 +28,7 @@ func (handler *AuthHandler) Route(app *fiber.App) {
 func (handler *AuthHandler) Register(c *fiber.Ctx) error {
 	var input models.RegisterRequest
 	err := c.BodyParser(&input)
-
-	// exception.ValidationForm(err)
-
-	err = handler.AuthService.Register(input)
-
 	if err != nil {
-		//error
-		if err.Error() == "unique" {
-			return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
-				Status:  false,
-				Message: "Failed to POST data",
-				Error:   exceptions.NewString("No Telp Registered, Please Login"),
-				Data:    nil,
-			})
-		}
 		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
 			Message: "Failed to POST data",
@@ -51,11 +37,21 @@ func (handler *AuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(http.StatusCreated).JSON(responder.ApiResponse{
+	newUser, err := handler.AuthService.Register(input)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Failed to POST data",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(responder.ApiResponse{
 		Status:  true,
 		Message: "Succeed to POST data",
 		Error:   nil,
-		Data:    "Register Succeed",
+		Data:    newUser,
 	})
 }
 

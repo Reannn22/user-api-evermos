@@ -1,7 +1,6 @@
 package repositories
 
 import (
-	"mini-project-evermos/models"
 	"mini-project-evermos/models/entities"
 
 	"gorm.io/gorm"
@@ -9,7 +8,7 @@ import (
 
 // Contract
 type AuthRepository interface {
-	Register(auth models.RegisterProcess) error
+	Register(user entities.User) (entities.User, error)
 }
 
 type authRepositoryImpl struct {
@@ -20,32 +19,20 @@ func NewAuthRepository(database *gorm.DB) AuthRepository {
 	return &authRepositoryImpl{database}
 }
 
-func (repository *authRepositoryImpl) Register(auth models.RegisterProcess) error {
-	tx := repository.database.Begin()
+func (repository *authRepositoryImpl) Register(user entities.User) (entities.User, error) {
+	// First, try to find any existing records (including soft-deleted ones)
+	var existingUser entities.User
+	result := repository.database.Unscoped().Where("notelp = ? OR email = ?", user.Notelp, user.Email).First(&existingUser)
 
-	user := &entities.User{
-		Nama:         auth.Nama,
-		Notelp:       auth.NoTelp,
-		Email:        auth.Email,
-		KataSandi:    auth.KataSandi,
-		Pekerjaan:    auth.Pekerjaan,
-		TanggalLahir: auth.TanggalLahir,
-		IDProvinsi:   auth.IDProvinsi,
-		IDKota:       auth.IDKota,
+	if result.Error == nil {
+		// If found, hard delete the existing record
+		repository.database.Unscoped().Delete(&existingUser)
 	}
 
-	if err := tx.Create(user).Error; err != nil {
-		tx.Rollback()
-		return err
+	// Now create the new user
+	err := repository.database.Create(&user).Error
+	if err != nil {
+		return entities.User{}, err
 	}
-
-	if err := tx.Create(&entities.Store{
-		IDUser: user.ID,
-	}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	tx.Commit()
-	return nil
+	return user, nil
 }
