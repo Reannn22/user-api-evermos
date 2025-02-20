@@ -21,7 +21,7 @@ func NewAddressHandler(addressService *services.AddressService) AddressHandler {
 }
 
 func (handler *AddressHandler) Route(app *fiber.App) {
-	routes := app.Group("/api/v1/user/alamat")
+	routes := app.Group("/api/v1/address")
 	routes.Get("/", middleware.JWTProtected(), handler.AddressList)
 	routes.Get("/:id", middleware.JWTProtected(), handler.AddressDetail)
 	routes.Post("/", middleware.JWTProtected(), handler.AddressCreate)

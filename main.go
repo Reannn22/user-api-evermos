@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"mini-project-evermos/configs"
 	"mini-project-evermos/handlers"
+	"mini-project-evermos/models/entities" // Add this import
 	"mini-project-evermos/models/entities/migration"
 	"mini-project-evermos/models/responder"
 	"mini-project-evermos/repositories"
@@ -29,6 +31,19 @@ func main() {
 	// Setup Migration
 	migration.Migration(database)
 
+	// In your main function or init DB function
+	database.AutoMigrate(
+		&entities.User{},
+		&entities.Address{},
+		&entities.Trx{},
+		&entities.TrxDetail{},
+		&entities.ProductLog{},
+		&entities.Product{},
+		&entities.Category{},
+		&entities.Store{},
+		&entities.ProductPicture{},
+	)
+
 	// Setup Repository
 	authRepository := repositories.NewAuthRepository(database)
 	userRepository := repositories.NewUserRepository(database)
@@ -46,7 +61,7 @@ func main() {
 	regionService := services.NewRegionService()
 	categoryService := services.NewCategoryService(&categoryRepository)
 	storeService := services.NewStoreService(&storeRepository)
-	productService := services.NewProductService(&productRepository, &storeRepository, &productPictureRepository)
+	productService := services.NewProductService(&productRepository, &storeRepository, &productPictureRepository, &categoryRepository) // Updated this line
 	transactionService := services.NewTransactionService(&transactionRepository, &productRepository, &addressRepository)
 
 	// Setup Handler
@@ -62,7 +77,11 @@ func main() {
 	// Setup Fiber
 	app := fiber.New(configs.NewFiberConfig())
 
-	fiber.New(configs.NewFiberConfig())
+	// Add debugging middleware
+	app.Use(func(c *fiber.Ctx) error {
+		fmt.Printf("Request: %s %s\n", c.Method(), c.Path())
+		return c.Next()
+	})
 
 	app.Use(recover.New())
 	app.Use(cors.New())

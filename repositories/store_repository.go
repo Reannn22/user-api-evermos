@@ -14,6 +14,8 @@ type StoreRepository interface {
 	FindById(id uint) (entities.Store, error)
 	FindByUserId(id uint) (entities.Store, error)
 	Update(id uint, store entities.Store) (bool, error)
+	Insert(store entities.Store) (entities.Store, error)
+	Delete(id uint) (bool, error)
 }
 
 type storeRepositoryImpl struct {
@@ -47,11 +49,13 @@ func (repository *storeRepositoryImpl) FindAllPagination(pagination responder.Pa
 	storesFormatter := []models.StoreResponse{}
 
 	for _, store := range stores {
-		storeFormatter := models.StoreResponse{}
-		storeFormatter.ID = store.ID
-		storeFormatter.NamaToko = store.NamaToko
-		storeFormatter.UrlFoto = store.UrlFoto
-
+		storeFormatter := models.StoreResponse{
+			ID:        store.ID,
+			NamaToko:  store.NamaToko,
+			UrlFoto:   store.UrlFoto,
+			CreatedAt: store.CreatedAt, // Add timestamps
+			UpdatedAt: store.UpdatedAt, // Add timestamps
+		}
 		storesFormatter = append(storesFormatter, storeFormatter)
 	}
 
@@ -89,5 +93,21 @@ func (repository *storeRepositoryImpl) Update(id uint, store entities.Store) (bo
 		return false, err
 	}
 
+	return true, nil
+}
+
+func (repository *storeRepositoryImpl) Insert(store entities.Store) (entities.Store, error) {
+	err := repository.database.Create(&store).Error
+	if err != nil {
+		return entities.Store{}, err
+	}
+	return store, nil
+}
+
+func (repository *storeRepositoryImpl) Delete(id uint) (bool, error) {
+	err := repository.database.Delete(&entities.Store{}, id).Error
+	if err != nil {
+		return false, err
+	}
 	return true, nil
 }

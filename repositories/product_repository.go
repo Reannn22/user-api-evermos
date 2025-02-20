@@ -4,6 +4,7 @@ import (
 	"mini-project-evermos/models"
 	"mini-project-evermos/models/entities"
 	"mini-project-evermos/models/responder"
+	"time"
 
 	"github.com/gosimple/slug"
 	"gorm.io/gorm"
@@ -13,7 +14,7 @@ import (
 type ProductRepository interface {
 	FindAllPagination(pagination responder.Pagination) (responder.Pagination, error)
 	FindById(id uint) (entities.Product, error)
-	Insert(product models.ProductRequest) (bool, error)
+	Insert(product models.ProductRequest) (entities.Product, error)
 	Update(product models.ProductRequest, id uint) (bool, error)
 	Destroy(id uint) (bool, error)
 }
@@ -30,13 +31,6 @@ func (repository *productRepositoryImpl) FindAllPagination(pagination responder.
 	var products []entities.Product
 
 	keyword := "%" + pagination.Keyword + "%"
-	// where_value := func(keyword string) *gorm.DB {
-	// 	return repository.database.Where("nama_toko LIKE ?", keyword)
-	// }
-
-	// err := where_value(keyword).
-	// 	Scopes(responder.PaginationFormat(keyword, stores, &pagination, where_value(keyword))).
-	// 	Find(&stores).Error
 
 	err := repository.database.
 		Preload("Store").
@@ -65,6 +59,8 @@ func (repository *productRepositoryImpl) FindAllPagination(pagination responder.
 		productFormatter.Store.UrlFoto = product.Store.UrlFoto
 		productFormatter.Category.ID = product.Category.ID
 		productFormatter.Category.NamaCategory = product.Category.NamaCategory
+		productFormatter.CreatedAt = product.CreatedAt
+		productFormatter.UpdatedAt = product.UpdatedAt
 
 		picturesFormatter := []models.ProductPictureResponse{}
 
@@ -101,38 +97,39 @@ func (repository *productRepositoryImpl) FindById(id uint) (entities.Product, er
 	return product, nil
 }
 
-func (repository *productRepositoryImpl) Insert(product models.ProductRequest) (bool, error) {
-	tx := repository.database.Begin()
-
-	create_product := &entities.Product{
-		NamaProduk:    product.NamaProduk,
-		Slug:          slug.Make(product.NamaProduk),
-		HargaReseller: product.HargaReseller,
-		HargaKonsumen: product.HargaKonsumen,
-		Stok:          product.Stok,
-		Deskripsi:     &product.Deskripsi,
-		IDCategory:    product.CategoryID,
-		IDToko:        product.StoreID,
+func (repository *productRepositoryImpl) Insert(input models.ProductRequest) (entities.Product, error) {
+	now := time.Now()
+	product := entities.Product{
+		NamaProduk:    input.NamaProduk,
+		IDToko:        input.StoreID,
+		IDCategory:    input.CategoryID,
+		HargaReseller: input.HargaReseller,
+		HargaKonsumen: input.HargaKonsumen,
+		Stok:          input.Stok,
+		Deskripsi:     &input.Deskripsi,
+		Slug:          slug.Make(input.NamaProduk),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
 	}
 
-	if err := tx.Create(create_product).Error; err != nil {
-		tx.Rollback()
-		return false, err
+	err := repository.database.Create(&product).Error
+	if err != nil {
+		return entities.Product{}, err
 	}
 
-	for _, v := range product.Photos {
-		if err := tx.Create(&entities.ProductPicture{
-			IDProduk: create_product.ID,
-			Url:      v,
-		}).Error; err != nil {
-			tx.Rollback()
-			return false, err
+	// Insert product pictures
+	for _, url := range input.PhotoURLs {
+		picture := entities.ProductPicture{
+			IDProduk: product.ID,
+			Url:      url,
+		}
+		err = repository.database.Create(&picture).Error
+		if err != nil {
+			return entities.Product{}, err
 		}
 	}
 
-	tx.Commit()
-
-	return true, nil
+	return product, nil
 }
 
 func (repository *productRepositoryImpl) Update(product models.ProductRequest, id uint) (bool, error) {
@@ -158,14 +155,11 @@ func (repository *productRepositoryImpl) Update(product models.ProductRequest, i
 		return false, err
 	}
 
-	for _, v := range product.Photos {
-		if err := tx.Create(&entities.ProductPicture{
-			IDProduk: id,
-			Url:      v,
-		}).Error; err != nil {
-			tx.Rollback()
-			return false, err
-		}
+	for _, photo := range product.PhotoURLs {
+		productPicture := entities.ProductPicture{}
+		productPicture.IDProduk = id
+		productPicture.Url = photo
+		repository.database.Create(&productPicture)
 	}
 
 	tx.Commit()

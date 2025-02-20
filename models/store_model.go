@@ -1,12 +1,17 @@
 package models
 
-import "mime/multipart"
+import (
+	"mime/multipart"
+	"time"
+)
 
 // Response
 type StoreResponse struct {
-	ID       uint    `json:"id"`
-	NamaToko *string `json:"nama_toko"`
-	UrlFoto  *string `json:"url_foto"`
+	ID        uint       `json:"id"`
+	NamaToko  *string    `json:"nama_toko"`
+	UrlFoto   *string    `json:"url_foto"`
+	CreatedAt *time.Time `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
 }
 
 type StoreUpdate struct {
@@ -15,10 +20,12 @@ type StoreUpdate struct {
 }
 
 type StoreProcess struct {
-	ID       uint
-	UserID   uint
-	NamaToko *string
-	URL      string
+	ID        uint
+	UserID    uint
+	NamaToko  *string
+	URL       string
+	CreatedAt *time.Time
+	UpdatedAt *time.Time
 }
 
 type File struct {

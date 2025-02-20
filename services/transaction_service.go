@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"mini-project-evermos/models"
 	"mini-project-evermos/models/responder"
 	"mini-project-evermos/repositories"
@@ -48,8 +49,18 @@ func (service *transactionServiceImpl) Create(input models.TransactionRequest, u
 	//check alamat
 	check_address, err := service.repositoryAddress.FindById(input.AlamatKirim)
 
+	// Add error check for address not found
+	if err != nil {
+		fmt.Printf("Address not found: %v\n", err)
+		return false, errors.New("address not found")
+	}
+
+	// Debug print
+	fmt.Printf("Address ID: %d, User ID from token: %d, Address User ID: %d\n",
+		input.AlamatKirim, user_id, check_address.IDUser)
+
 	if check_address.IDUser != user_id {
-		return false, errors.New("forbidden")
+		return false, errors.New("forbidden: address does not belong to user")
 	}
 
 	date_now := time.Now()

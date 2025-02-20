@@ -33,24 +33,21 @@ func (handler *ProductHandler) Route(app *fiber.App) {
 }
 
 func (handler *ProductHandler) GetAllProduct(c *fiber.Ctx) error {
-	limit, err := strconv.Atoi(c.FormValue("limit"))
-	if err != nil {
-		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
-			Status:  false,
-			Message: "Failed to GET data",
-			Error:   exceptions.NewString("limit required."),
-			Data:    nil,
-		})
+	// Default values
+	limit := 10
+	page := 1
+
+	// Try to get values from query params
+	if c.FormValue("limit") != "" {
+		if val, err := strconv.Atoi(c.FormValue("limit")); err == nil {
+			limit = val
+		}
 	}
 
-	page, err := strconv.Atoi(c.FormValue("page"))
-	if err != nil {
-		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
-			Status:  false,
-			Message: "Failed to GET data",
-			Error:   exceptions.NewString("page required."),
-			Data:    nil,
-		})
+	if c.FormValue("page") != "" {
+		if val, err := strconv.Atoi(c.FormValue("page")); err == nil {
+			page = val
+		}
 	}
 
 	keyword := c.FormValue("keyword")
@@ -118,10 +115,8 @@ func (handler *ProductHandler) ProductDetail(c *fiber.Ctx) error {
 }
 
 func (handler *ProductHandler) ProductCreate(c *fiber.Ctx) error {
-	//claim
 	claims, err := jwt.ExtractTokenMetadata(c)
 	if err != nil {
-		// Return status 500 and JWT parse error.
 		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
 			Message: "Failed to POST data",
@@ -132,35 +127,40 @@ func (handler *ProductHandler) ProductCreate(c *fiber.Ctx) error {
 
 	user_id := claims.UserId
 
-	formFile, err := c.MultipartForm()
-	var file_name []string
-	for _, fileHeaders := range formFile.File {
-		for _, fileHeader := range fileHeaders {
-			date_now := time.Now()
-			string_date := date_now.Format("2006_01_02_15_04_05")
-
-			filename := string_date + "-" + fileHeader.Filename
-			c.SaveFile(fileHeader, fmt.Sprintf("uploads/%s", filename))
-			file_name = append(file_name, filename)
-		}
+	// Parse the form values
+	category_id, err := strconv.Atoi(c.FormValue("category_id"))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Invalid category_id",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
 	}
 
-	category_id, err := strconv.Atoi(c.FormValue("category_id"))
 	stok, err := strconv.Atoi(c.FormValue("stok"))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
+			Status:  false,
+			Message: "Invalid stok",
+			Error:   exceptions.NewString(err.Error()),
+			Data:    nil,
+		})
+	}
 
-	input := models.ProductRequest{}
-	input.NamaProduk = c.FormValue("nama_produk")
-	input.CategoryID = uint(category_id)
-	input.HargaReseller = c.FormValue("harga_reseller")
-	input.HargaKonsumen = c.FormValue("harga_konsumen")
-	input.Stok = stok
-	input.Deskripsi = c.FormValue("deskripsi")
-	input.Photos = file_name
+	// Create product request
+	input := models.ProductRequest{
+		NamaProduk:    c.FormValue("nama_produk"),
+		CategoryID:    uint(category_id),
+		HargaReseller: c.FormValue("harga_reseller"),
+		HargaKonsumen: c.FormValue("harga_konsumen"),
+		Stok:          stok,
+		Deskripsi:     c.FormValue("deskripsi"),
+		PhotoURLs:     []string{c.FormValue("photo_url")}, // Use photo_url instead of file upload
+	}
 
 	response, err := handler.ProductService.Create(input, uint(user_id))
-
 	if err != nil {
-		//error
 		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
 			Message: "Failed to POST data",
@@ -168,6 +168,7 @@ func (handler *ProductHandler) ProductCreate(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
+
 	return c.Status(http.StatusOK).JSON(responder.ApiResponse{
 		Status:  true,
 		Message: "Succeed to POST data",
@@ -224,7 +225,7 @@ func (handler *ProductHandler) ProductUpdate(c *fiber.Ctx) error {
 	input.HargaKonsumen = c.FormValue("harga_konsumen")
 	input.Stok = stok
 	input.Deskripsi = c.FormValue("deskripsi")
-	input.Photos = file_name
+	input.PhotoURLs = file_name // Changed from Photos to PhotoURLs
 
 	response, err := handler.ProductService.Update(input, uint(id), uint(user_id))
 
@@ -271,9 +272,7 @@ func (handler *ProductHandler) ProductDelete(c *fiber.Ctx) error {
 	}
 
 	response, err := handler.ProductService.Delete(uint(id), uint(user_id))
-
 	if err != nil {
-		//error
 		return c.Status(http.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
 			Message: "Failed to DELETE data",
@@ -281,6 +280,7 @@ func (handler *ProductHandler) ProductDelete(c *fiber.Ctx) error {
 			Data:    nil,
 		})
 	}
+
 	return c.Status(http.StatusOK).JSON(responder.ApiResponse{
 		Status:  true,
 		Message: "Succeed to DELETE data",

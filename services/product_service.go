@@ -2,32 +2,39 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"mini-project-evermos/models"
 	"mini-project-evermos/models/responder"
 	"mini-project-evermos/repositories"
 	"os"
 )
 
-// Contract
 type ProductService interface {
 	GetAll(limit int, page int, keyword string) (responder.Pagination, error)
 	GetById(id uint, user_id uint) (models.ProductResponse, error)
-	Create(input models.ProductRequest, user_id uint) (bool, error)
-	Update(input models.ProductRequest, id uint, user_id uint) (bool, error)
-	Delete(id uint, user_id uint) (bool, error)
+	Create(input models.ProductRequest, user_id uint) (models.ProductResponse, error)
+	Update(input models.ProductRequest, id uint, user_id uint) (models.ProductResponse, error)
+	Delete(id uint, user_id uint) (models.ProductResponse, error)
 }
 
 type productServiceImpl struct {
 	repository               repositories.ProductRepository
 	repositoryProductPicture repositories.ProductPictureRepository
 	repositoryStore          repositories.StoreRepository
+	repositoryCategory       repositories.CategoryRepository
 }
 
-func NewProductService(productRepository *repositories.ProductRepository, storeRepository *repositories.StoreRepository, productPictureRepository *repositories.ProductPictureRepository) ProductService {
+func NewProductService(
+	productRepository *repositories.ProductRepository,
+	storeRepository *repositories.StoreRepository,
+	productPictureRepository *repositories.ProductPictureRepository,
+	categoryRepository *repositories.CategoryRepository,
+) ProductService {
 	return &productServiceImpl{
 		repository:               *productRepository,
 		repositoryProductPicture: *productPictureRepository,
 		repositoryStore:          *storeRepository,
+		repositoryCategory:       *categoryRepository,
 	}
 }
 
@@ -38,7 +45,6 @@ func (service *productServiceImpl) GetAll(limit int, page int, keyword string) (
 	request.Keyword = keyword
 
 	response, err := service.repository.FindAllPagination(request)
-
 	if err != nil {
 		return responder.Pagination{}, err
 	}
@@ -47,7 +53,6 @@ func (service *productServiceImpl) GetAll(limit int, page int, keyword string) (
 
 func (service *productServiceImpl) GetById(id uint, user_id uint) (models.ProductResponse, error) {
 	product, err := service.repository.FindById(id)
-
 	if err != nil {
 		return models.ProductResponse{}, err
 	}
@@ -69,15 +74,15 @@ func (service *productServiceImpl) GetById(id uint, user_id uint) (models.Produc
 	response.Store.UrlFoto = product.Store.UrlFoto
 	response.Category.ID = product.Category.ID
 	response.Category.NamaCategory = product.Category.NamaCategory
+	response.CreatedAt = product.CreatedAt
+	response.UpdatedAt = product.UpdatedAt
 
 	picturesFormatter := []models.ProductPictureResponse{}
-
 	for _, picture := range product.ProductPicture {
 		pictureFormatter := models.ProductPictureResponse{}
 		pictureFormatter.ID = picture.ID
 		pictureFormatter.IDProduk = picture.IDProduk
 		pictureFormatter.Url = picture.Url
-
 		picturesFormatter = append(picturesFormatter, pictureFormatter)
 	}
 	response.Photos = picturesFormatter
@@ -85,72 +90,77 @@ func (service *productServiceImpl) GetById(id uint, user_id uint) (models.Produc
 	return response, nil
 }
 
-func (service *productServiceImpl) Create(input models.ProductRequest, user_id uint) (bool, error) {
+func (service *productServiceImpl) Create(input models.ProductRequest, user_id uint) (models.ProductResponse, error) {
 	store, err := service.repositoryStore.FindByUserId(user_id)
-
 	if err != nil {
-		return false, err
+		return models.ProductResponse{}, err
 	}
+
+	category, err := service.repositoryCategory.FindById(input.CategoryID)
+	if err != nil {
+		return models.ProductResponse{}, err
+	}
+	if category.ID == 0 {
+		return models.ProductResponse{}, errors.New("category with ID " + fmt.Sprint(input.CategoryID) + " not found")
+	}
+
 	input.StoreID = store.ID
 
-	save, err := service.repository.Insert(input)
-
+	product, err := service.repository.Insert(input)
 	if err != nil {
-		for _, v := range input.Photos {
+		for _, v := range input.PhotoURLs {
 			os.Remove("uploads/" + v)
 		}
-		return false, err
+		return models.ProductResponse{}, err
 	}
 
-	return save, nil
+	// Get the complete product data to return
+	return service.GetById(product.ID, user_id)
 }
 
-func (service *productServiceImpl) Update(input models.ProductRequest, id uint, user_id uint) (bool, error) {
+func (service *productServiceImpl) Update(input models.ProductRequest, id uint, user_id uint) (models.ProductResponse, error) {
 	product, err := service.repository.FindById(id)
-
 	if err != nil {
-		return false, err
+		return models.ProductResponse{}, err
 	}
 
 	if product.Store.IDUser != user_id {
-		for _, v := range input.Photos {
+		for _, v := range input.PhotoURLs {
 			os.Remove("uploads/" + v)
 		}
-		return false, errors.New("forbidden")
+		return models.ProductResponse{}, errors.New("forbidden")
 	}
 
 	picture, err := service.repositoryProductPicture.FindByProductId(id)
-
-	update, err := service.repository.Update(input, id)
+	_, err = service.repository.Update(input, id)
 
 	if err != nil {
-		for _, v := range input.Photos {
+		for _, v := range input.PhotoURLs {
 			os.Remove("uploads/" + v)
 		}
-		return false, err
+		return models.ProductResponse{}, err
 	}
 
 	for _, v := range picture {
 		os.Remove("uploads/" + v.Url)
 	}
 
-	return update, nil
+	// Get the updated product data to return
+	return service.GetById(id, user_id)
 }
 
-func (service *productServiceImpl) Delete(id uint, user_id uint) (bool, error) {
-	//check
-	product, err := service.repository.FindById(id)
-
+func (service *productServiceImpl) Delete(id uint, user_id uint) (models.ProductResponse, error) {
+	// Get the product data before deletion
+	product, err := service.GetById(id, user_id)
 	if err != nil {
-		return false, err
+		return models.ProductResponse{}, err
 	}
 
-	if product.Store.IDUser != user_id {
-		return false, errors.New("forbidden")
+	// Perform deletion
+	_, err = service.repository.Destroy(id)
+	if err != nil {
+		return models.ProductResponse{}, err
 	}
 
-	//delete role
-	res, err := service.repository.Destroy(id)
-
-	return res, err
+	return product, nil
 }

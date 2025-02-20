@@ -10,8 +10,8 @@ import (
 type CategoryRepository interface {
 	FindAll() ([]entities.Category, error)
 	FindById(id uint) (entities.Category, error)
-	Insert(category entities.Category) (bool, error)
-	Update(id uint, category entities.Category) (bool, error)
+	Insert(category entities.Category) (entities.Category, error)
+	Update(id uint, category entities.Category) (entities.Category, error)
 	Destroy(id uint) (bool, error)
 }
 
@@ -47,24 +47,15 @@ func (repository *categoryRepositoryImpl) FindById(id uint) (entities.Category, 
 	return category, nil
 }
 
-func (repository *categoryRepositoryImpl) Insert(category entities.Category) (bool, error) {
+func (repository *categoryRepositoryImpl) Insert(category entities.Category) (entities.Category, error) {
 	err := repository.database.Create(&category).Error
-
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return category, err
 }
 
-func (repository *categoryRepositoryImpl) Update(id uint, category entities.Category) (bool, error) {
-	err := repository.database.Model(&category).Where("id = ?", id).Updates(category).Error
-
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
+func (repository *categoryRepositoryImpl) Update(id uint, category entities.Category) (entities.Category, error) {
+	category.ID = id
+	err := repository.database.Save(&category).Error
+	return category, err
 }
 
 func (repository *categoryRepositoryImpl) Destroy(id uint) (bool, error) {

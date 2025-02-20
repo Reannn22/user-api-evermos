@@ -11,9 +11,9 @@ import (
 type AddressService interface {
 	GetAll(user_id uint) ([]models.AddressResponse, error)
 	GetById(id uint, user_id uint) (models.AddressResponse, error)
-	Create(payload models.AddressRequest, user_id uint) (bool, error)
-	Edit(id uint, payload models.AddressRequest, user_id uint) (bool, error)
-	Delete(id uint, user_id uint) (bool, error)
+	Create(payload models.AddressRequest, user_id uint) (models.AddressResponse, error)
+	Edit(id uint, payload models.AddressRequest, user_id uint) (models.AddressResponse, error)
+	Delete(id uint, user_id uint) (models.AddressResponse, error)
 }
 
 type addressServiceImpl struct {
@@ -37,13 +37,15 @@ func (service *addressServiceImpl) GetAll(user_id uint) ([]models.AddressRespons
 	responses := []models.AddressResponse{}
 
 	for _, address := range addresses {
-		response := models.AddressResponse{}
-		response.ID = address.ID
-		response.JudulAlamat = address.JudulAlamat
-		response.NamaPenerima = address.NamaPenerima
-		response.NoTelp = address.NoTelp
-		response.DetailAlamat = address.DetailAlamat
-
+		response := models.AddressResponse{
+			ID:           address.ID,
+			JudulAlamat:  address.JudulAlamat,
+			NamaPenerima: address.NamaPenerima,
+			NoTelp:       address.NoTelp,
+			DetailAlamat: address.DetailAlamat,
+			CreatedAt:    address.CreatedAt,
+			UpdatedAt:    address.UpdatedAt,
+		}
 		responses = append(responses, response)
 	}
 
@@ -61,67 +63,133 @@ func (service *addressServiceImpl) GetById(id uint, user_id uint) (models.Addres
 		return models.AddressResponse{}, errors.New("forbidden")
 	}
 
-	var response = models.AddressResponse{}
-	response.ID = address.ID
-	response.JudulAlamat = address.JudulAlamat
-	response.NamaPenerima = address.NamaPenerima
-	response.NoTelp = address.NoTelp
-	response.DetailAlamat = address.DetailAlamat
+	var response = models.AddressResponse{
+		ID:           address.ID,
+		JudulAlamat:  address.JudulAlamat,
+		NamaPenerima: address.NamaPenerima,
+		NoTelp:       address.NoTelp,
+		DetailAlamat: address.DetailAlamat,
+		CreatedAt:    address.CreatedAt,
+		UpdatedAt:    address.UpdatedAt,
+	}
 
 	return response, nil
 }
 
-func (service *addressServiceImpl) Create(payload models.AddressRequest, user_id uint) (bool, error) {
-	address := entities.Address{}
-	address.IDUser = user_id
-	address.JudulAlamat = payload.JudulAlamat
-	address.NamaPenerima = payload.NamaPenerima
-	address.NoTelp = payload.NoTelp
-	address.DetailAlamat = payload.DetailAlamat
+func (service *addressServiceImpl) Create(payload models.AddressRequest, user_id uint) (models.AddressResponse, error) {
+	address := entities.Address{
+		IDUser:       user_id,
+		JudulAlamat:  payload.JudulAlamat,
+		NamaPenerima: payload.NamaPenerima,
+		NoTelp:       payload.NoTelp,
+		DetailAlamat: payload.DetailAlamat,
+		IDProvinsi:   payload.IDProvinsi,
+		IDKota:       payload.IDKota,
+	}
 
-	//create
-	res, err := service.repository.Insert(address)
+	success, err := service.repository.Insert(address)
+	if err != nil || !success {
+		return models.AddressResponse{}, err
+	}
 
-	return res, err
+	// Fetch the created address to get the complete data including timestamps
+	created_address, err := service.repository.FindByCondition(map[string]interface{}{
+		"id_user":       user_id,
+		"judul_alamat":  payload.JudulAlamat,
+		"nama_penerima": payload.NamaPenerima,
+		"no_telp":       payload.NoTelp,
+		"detail_alamat": payload.DetailAlamat,
+	})
+	if err != nil {
+		return models.AddressResponse{}, err
+	}
+
+	response := models.AddressResponse{
+		ID:           created_address.ID,
+		JudulAlamat:  created_address.JudulAlamat,
+		NamaPenerima: created_address.NamaPenerima,
+		NoTelp:       created_address.NoTelp,
+		DetailAlamat: created_address.DetailAlamat,
+		CreatedAt:    created_address.CreatedAt,
+		UpdatedAt:    created_address.UpdatedAt,
+	}
+
+	return response, nil
 }
 
-func (service *addressServiceImpl) Edit(id uint, payload models.AddressRequest, user_id uint) (bool, error) {
+func (service *addressServiceImpl) Edit(id uint, payload models.AddressRequest, user_id uint) (models.AddressResponse, error) {
 	//check
 	check_address, err := service.repository.FindById(id)
 
 	if err != nil {
-		return false, err
+		return models.AddressResponse{}, err
 	}
 
 	if check_address.IDUser != user_id {
-		return false, errors.New("forbidden")
+		return models.AddressResponse{}, errors.New("forbidden")
 	}
 
-	address := entities.Address{}
-	address.NamaPenerima = payload.NamaPenerima
-	address.NoTelp = payload.NoTelp
-	address.DetailAlamat = payload.DetailAlamat
+	address := entities.Address{
+		JudulAlamat:  check_address.JudulAlamat, // Keep the original judul_alamat
+		NamaPenerima: payload.NamaPenerima,
+		NoTelp:       payload.NoTelp,
+		DetailAlamat: payload.DetailAlamat,
+		IDProvinsi:   payload.IDProvinsi,
+		IDKota:       payload.IDKota,
+	}
 
 	//update
-	res, err := service.repository.Update(id, address)
+	success, err := service.repository.Update(id, address)
+	if err != nil || !success {
+		return models.AddressResponse{}, err
+	}
 
-	return res, err
+	// Fetch the updated address to get the latest data including timestamps
+	updated_address, err := service.repository.FindById(id)
+	if err != nil {
+		return models.AddressResponse{}, err
+	}
+
+	response := models.AddressResponse{
+		ID:           updated_address.ID,
+		JudulAlamat:  updated_address.JudulAlamat,
+		NamaPenerima: updated_address.NamaPenerima,
+		NoTelp:       updated_address.NoTelp,
+		DetailAlamat: updated_address.DetailAlamat,
+		CreatedAt:    updated_address.CreatedAt,
+		UpdatedAt:    updated_address.UpdatedAt,
+	}
+
+	return response, nil
 }
 
-func (service *addressServiceImpl) Delete(id uint, user_id uint) (bool, error) {
+func (service *addressServiceImpl) Delete(id uint, user_id uint) (models.AddressResponse, error) {
 	//check
 	check_address, err := service.repository.FindById(id)
 
 	if err != nil {
-		return false, err
+		return models.AddressResponse{}, err
 	}
 
 	if check_address.IDUser != user_id {
-		return false, errors.New("forbidden")
+		return models.AddressResponse{}, errors.New("forbidden")
 	}
 
 	//delete role
-	res, err := service.repository.Destroy(id)
+	_, err = service.repository.Destroy(id)
+	if err != nil {
+		return models.AddressResponse{}, err
+	}
 
-	return res, err
+	response := models.AddressResponse{
+		ID:           check_address.ID,
+		JudulAlamat:  check_address.JudulAlamat,
+		NamaPenerima: check_address.NamaPenerima,
+		NoTelp:       check_address.NoTelp,
+		DetailAlamat: check_address.DetailAlamat,
+		CreatedAt:    check_address.CreatedAt,
+		UpdatedAt:    check_address.UpdatedAt,
+	}
+
+	return response, nil
 }
