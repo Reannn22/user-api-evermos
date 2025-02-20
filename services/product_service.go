@@ -88,10 +88,13 @@ func (service *productServiceImpl) GetById(id uint, user_id uint) (models.Produc
 
 	picturesFormatter := []models.ProductPictureResponse{}
 	for _, picture := range product.ProductPicture {
-		pictureFormatter := models.ProductPictureResponse{}
-		pictureFormatter.ID = picture.ID
-		pictureFormatter.IDProduk = picture.IDProduk
-		pictureFormatter.Url = picture.Url
+		pictureFormatter := models.ProductPictureResponse{
+			ID:        picture.ID,
+			IDProduk:  picture.IDProduk,
+			Url:       picture.Url,
+			CreatedAt: picture.CreatedAt,
+			UpdatedAt: picture.UpdatedAt,
+		}
 		picturesFormatter = append(picturesFormatter, pictureFormatter)
 	}
 	response.Photos = picturesFormatter

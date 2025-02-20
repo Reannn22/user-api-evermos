@@ -5,6 +5,8 @@ import (
 	"mini-project-evermos/models/entities"
 	"mini-project-evermos/models/responder"
 
+	"math"
+
 	"gorm.io/gorm"
 )
 
@@ -25,92 +27,49 @@ func NewTransactionRepository(database *gorm.DB) TransactionRepository {
 
 func (repository *transactionRepositoryImpl) FindAllPagination(pagination responder.Pagination) (responder.Pagination, error) {
 	var transactions []entities.Trx
+	var totalRows int64
 
-	keyword := "%" + pagination.Keyword + "%"
-	where_value := func(keyword string) *gorm.DB {
-		if keyword != "" {
-			return repository.database.Where("kode_invoice LIKE ?", keyword).Or("method_bayar LIKE ?", keyword)
-		}
-		return repository.database
-	}
+	query := repository.database.Model(&entities.Trx{})
+	query.Count(&totalRows)
 
-	err := where_value(keyword).
-		Preload("Address").
+	err := query.
+		Preload("User").
 		Preload("TrxDetail").
+		Preload("TrxDetail.ProductLog").
 		Preload("TrxDetail.Store").
-		Preload("TrxDetail.ProductLog.Product").
-		Preload("TrxDetail.ProductLog.Product.Store").
-		Preload("TrxDetail.ProductLog.Product.Category").
-		Preload("TrxDetail.ProductLog.Product.ProductPicture").
-		Scopes(responder.PaginationFormat(keyword, transactions, &pagination, where_value(keyword))).
+		Limit(pagination.Limit).
+		Offset(pagination.GetOffset()).
 		Find(&transactions).Error
 
 	if err != nil {
-		return pagination, err
+		return responder.Pagination{}, err
 	}
 
-	transactionsFormatter := []models.TransactionResponse{}
-
-	for _, transaction := range transactions {
-		transactionFormatter := models.TransactionResponse{}
-		transactionFormatter.ID = transaction.ID
-		transactionFormatter.HargaTotal = transaction.HargaTotal
-		transactionFormatter.KodeInvoice = transaction.KodeInvoice
-		transactionFormatter.MethodBayar = transaction.MethodBayar
-		transactionFormatter.Address.ID = transaction.Address.ID
-		transactionFormatter.Address.JudulAlamat = transaction.Address.JudulAlamat
-		transactionFormatter.Address.NamaPenerima = transaction.Address.NamaPenerima
-		transactionFormatter.Address.NoTelp = transaction.Address.NoTelp
-		transactionFormatter.Address.DetailAlamat = transaction.Address.DetailAlamat
-
-		detailsFormatter := []models.TransactionDetailResponse{}
-
-		for _, detail := range transaction.TrxDetail {
-			detailFormatter := models.TransactionDetailResponse{}
-			detailFormatter.ID = detail.ID
-			detailFormatter.Kuantitas = detail.Kuantitas
-			detailFormatter.HargaTotal = detail.HargaTotal
-			detailFormatter.Store.ID = detail.Store.ID
-			detailFormatter.Store.NamaToko = detail.Store.NamaToko
-			detailFormatter.Store.UrlFoto = detail.Store.UrlFoto
-
-			detailFormatter.Product.ID = detail.ProductLog.Product.ID
-			detailFormatter.Product.NamaProduk = detail.ProductLog.Product.NamaProduk
-			detailFormatter.Product.Slug = detail.ProductLog.Product.Slug
-			detailFormatter.Product.HargaReseller = detail.ProductLog.Product.HargaReseller
-			detailFormatter.Product.HargaKonsumen = detail.ProductLog.Product.HargaKonsumen
-			detailFormatter.Product.Stok = detail.ProductLog.Product.Stok
-			detailFormatter.Product.Deskripsi = detail.ProductLog.Product.Deskripsi
-			detailFormatter.Product.Store.ID = detail.ProductLog.Product.Store.ID
-			detailFormatter.Product.Store.NamaToko = detail.ProductLog.Product.Store.NamaToko
-			detailFormatter.Product.Store.UrlFoto = detail.ProductLog.Product.Store.UrlFoto
-			detailFormatter.Product.Category.ID = detail.ProductLog.Product.Category.ID
-			detailFormatter.Product.Category.NamaCategory = detail.ProductLog.Product.Category.NamaCategory
-
-			photosFormatter := []models.ProductPictureResponse{}
-
-			for _, photo := range detail.ProductLog.Product.ProductPicture {
-				photoFormatter := models.ProductPictureResponse{}
-				photoFormatter.ID = photo.ID
-				photoFormatter.IDProduk = photo.IDProduk
-				photoFormatter.Url = photo.Url
-
-				photosFormatter = append(photosFormatter, photoFormatter)
-			}
-			detailFormatter.Product.Photos = photosFormatter
-
-			detailsFormatter = append(detailsFormatter, detailFormatter)
+	var responses []models.TransactionResponse
+	for _, trx := range transactions {
+		response := models.TransactionResponse{
+			ID:          trx.ID,
+			HargaTotal:  trx.HargaTotal,
+			KodeInvoice: trx.KodeInvoice,
+			MethodBayar: trx.MethodBayar,
+			Address: models.AddressResponse{
+				ID:           trx.Address.ID,
+				JudulAlamat:  trx.Address.JudulAlamat,
+				NamaPenerima: trx.Address.NamaPenerima,
+				NoTelp:       trx.Address.NoTelp,
+				DetailAlamat: trx.Address.DetailAlamat,
+			},
+			CreatedAt: trx.CreatedAt,
+			UpdatedAt: trx.UpdatedAt,
 		}
-
-		transactionFormatter.TransactionDetails = detailsFormatter
-
-		transactionsFormatter = append(transactionsFormatter, transactionFormatter)
+		responses = append(responses, response)
 	}
 
-	pagination.Data = transactionsFormatter
+	pagination.Rows = responses
+	pagination.TotalRows = totalRows
+	pagination.TotalPages = int(math.Ceil(float64(totalRows) / float64(pagination.Limit)))
 
 	return pagination, nil
-
 }
 
 func (repository *transactionRepositoryImpl) FindById(id uint) (entities.Trx, error) {

@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // Request
 type TransactionRequest struct {
 	MethodBayar string                     `json:"method_bayar"`
@@ -15,6 +17,8 @@ type TransactionResponse struct {
 	MethodBayar        string                      `json:"method_bayar"`
 	Address            AddressResponse             `json:"alamat_kirim"`
 	TransactionDetails []TransactionDetailResponse `json:"detail_trx"`
+	CreatedAt          *time.Time                  `json:"created_at"`
+	UpdatedAt          *time.Time                  `json:"updated_at"`
 }
 
 type TransactionProcess struct {

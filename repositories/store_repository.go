@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"math"
 	"mini-project-evermos/models"
 	"mini-project-evermos/models/entities"
 	"mini-project-evermos/models/responder"
@@ -28,38 +29,37 @@ func NewStoreRepository(database *gorm.DB) StoreRepository {
 
 func (repository *storeRepositoryImpl) FindAllPagination(pagination responder.Pagination) (responder.Pagination, error) {
 	var stores []entities.Store
+	var totalRows int64
 
-	keyword := "%" + pagination.Keyword + "%"
-
-	where_value := func(keyword string) *gorm.DB {
-		if keyword != "" {
-			return repository.database.Where("nama_toko LIKE ?", keyword)
-		}
-		return repository.database
+	query := repository.database.Model(&entities.Store{})
+	if pagination.Keyword != "" {
+		query = query.Where("nama_toko LIKE ?", "%"+pagination.Keyword+"%")
 	}
+	query.Count(&totalRows)
 
-	err := where_value(keyword).
-		Scopes(responder.PaginationFormat(keyword, stores, &pagination, where_value(keyword))).
+	err := query.
+		Limit(pagination.Limit).
+		Offset(pagination.GetOffset()).
 		Find(&stores).Error
 
 	if err != nil {
-		return pagination, err
+		return responder.Pagination{}, err
 	}
 
-	storesFormatter := []models.StoreResponse{}
-
+	var responses []models.StoreResponse
 	for _, store := range stores {
-		storeFormatter := models.StoreResponse{
+		responses = append(responses, models.StoreResponse{
 			ID:        store.ID,
 			NamaToko:  store.NamaToko,
 			UrlFoto:   store.UrlFoto,
-			CreatedAt: store.CreatedAt, // Add timestamps
-			UpdatedAt: store.UpdatedAt, // Add timestamps
-		}
-		storesFormatter = append(storesFormatter, storeFormatter)
+			CreatedAt: store.CreatedAt,
+			UpdatedAt: store.UpdatedAt,
+		})
 	}
 
-	pagination.Data = storesFormatter
+	pagination.Rows = responses
+	pagination.TotalRows = totalRows
+	pagination.TotalPages = int(math.Ceil(float64(totalRows) / float64(pagination.Limit)))
 
 	return pagination, nil
 }

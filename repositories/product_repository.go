@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"math"
 	"mini-project-evermos/models"
 	"mini-project-evermos/models/entities"
 	"mini-project-evermos/models/responder"
@@ -10,7 +11,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// Contract
 type ProductRepository interface {
 	FindAllPagination(pagination responder.Pagination) (responder.Pagination, error)
 	FindById(id uint) (entities.Product, error)
@@ -27,63 +27,87 @@ func NewProductRepository(database *gorm.DB) ProductRepository {
 	return &productRepositoryImpl{database}
 }
 
-func (repository *productRepositoryImpl) FindAllPagination(pagination responder.Pagination) (responder.Pagination, error) {
+func (repository *productRepositoryImpl) FindAllPagination(request responder.Pagination) (responder.Pagination, error) {
 	var products []entities.Product
+	var totalRows int64
 
-	keyword := "%" + pagination.Keyword + "%"
+	// Count total rows
+	query := repository.database.Model(&entities.Product{})
+	if request.Keyword != "" {
+		query = query.Where("nama_produk LIKE ?", "%"+request.Keyword+"%")
+	}
+	query.Count(&totalRows)
 
-	err := repository.database.
+	// Update preload to ensure complete data loading
+	query = repository.database.Model(&entities.Product{}).
 		Preload("Store").
 		Preload("Category").
 		Preload("ProductPicture").
-		Scopes(responder.PaginationFormat(keyword, products, &pagination, repository.database)).
+		Order("id desc")
+
+	if request.Keyword != "" {
+		query = query.Where("nama_produk LIKE ?", "%"+request.Keyword+"%")
+	}
+
+	err := query.
+		Limit(request.Limit).
+		Offset(request.GetOffset()).
 		Find(&products).Error
 
 	if err != nil {
-		return pagination, err
+		return responder.Pagination{}, err
 	}
 
-	productsFormatter := []models.ProductResponse{}
-
+	var responses []models.ProductResponse
 	for _, product := range products {
-		productFormatter := models.ProductResponse{}
-		productFormatter.ID = product.ID
-		productFormatter.NamaProduk = product.NamaProduk
-		productFormatter.Slug = product.Slug
-		productFormatter.HargaReseller = product.HargaReseller
-		productFormatter.HargaKonsumen = product.HargaKonsumen
-		productFormatter.Stok = product.Stok
-		productFormatter.Deskripsi = product.Deskripsi
-		productFormatter.Store.ID = product.Store.ID
-		productFormatter.Store.NamaToko = product.Store.NamaToko
-		productFormatter.Store.UrlFoto = product.Store.UrlFoto
-		productFormatter.Category.ID = product.Category.ID
-		productFormatter.Category.NamaCategory = product.Category.NamaCategory
-		productFormatter.CreatedAt = product.CreatedAt
-		productFormatter.UpdatedAt = product.UpdatedAt
-
-		picturesFormatter := []models.ProductPictureResponse{}
-
-		for _, picture := range product.ProductPicture {
-			pictureFormatter := models.ProductPictureResponse{}
-			pictureFormatter.ID = picture.ID
-			pictureFormatter.IDProduk = picture.IDProduk
-			pictureFormatter.Url = picture.Url
-
-			picturesFormatter = append(picturesFormatter, pictureFormatter)
+		response := models.ProductResponse{
+			ID:            product.ID,
+			NamaProduk:    product.NamaProduk,
+			Slug:          product.Slug,
+			HargaReseller: product.HargaReseller,
+			HargaKonsumen: product.HargaKonsumen,
+			Stok:          product.Stok,
+			Deskripsi:     product.Deskripsi,
+			CreatedAt:     product.CreatedAt,
+			UpdatedAt:     product.UpdatedAt,
+			Store: models.StoreResponse{
+				ID:        product.Store.ID,
+				NamaToko:  product.Store.NamaToko,
+				UrlFoto:   product.Store.UrlFoto,
+				CreatedAt: product.Store.CreatedAt,
+				UpdatedAt: product.Store.UpdatedAt,
+			},
+			Category: models.CategoryResponse{
+				ID:           product.Category.ID,
+				NamaCategory: product.Category.NamaCategory,
+				CreatedAt:    product.Category.CreatedAt,
+				UpdatedAt:    product.Category.UpdatedAt,
+			},
 		}
-		productFormatter.Photos = picturesFormatter
-		productsFormatter = append(productsFormatter, productFormatter)
+
+		var pictures []models.ProductPictureResponse
+		for _, pic := range product.ProductPicture {
+			pictures = append(pictures, models.ProductPictureResponse{
+				ID:        pic.ID,
+				IDProduk:  pic.IDProduk,
+				Url:       pic.Url,
+				CreatedAt: pic.CreatedAt,
+				UpdatedAt: pic.UpdatedAt,
+			})
+		}
+		response.Photos = pictures
+		responses = append(responses, response)
 	}
 
-	pagination.Data = productsFormatter
+	request.Rows = responses
+	request.TotalRows = totalRows
+	request.TotalPages = int(math.Ceil(float64(totalRows) / float64(request.Limit)))
 
-	return pagination, nil
+	return request, nil
 }
 
 func (repository *productRepositoryImpl) FindById(id uint) (entities.Product, error) {
 	var product entities.Product
-
 	err := repository.database.
 		Preload("Store").
 		Preload("Category").
@@ -93,7 +117,6 @@ func (repository *productRepositoryImpl) FindById(id uint) (entities.Product, er
 	if err != nil {
 		return product, err
 	}
-
 	return product, nil
 }
 
@@ -117,7 +140,6 @@ func (repository *productRepositoryImpl) Insert(input models.ProductRequest) (en
 		return entities.Product{}, err
 	}
 
-	// Insert product pictures
 	for _, url := range input.PhotoURLs {
 		picture := entities.ProductPicture{
 			IDProduk: product.ID,
@@ -156,24 +178,24 @@ func (repository *productRepositoryImpl) Update(product models.ProductRequest, i
 	}
 
 	for _, photo := range product.PhotoURLs {
-		productPicture := entities.ProductPicture{}
-		productPicture.IDProduk = id
-		productPicture.Url = photo
-		repository.database.Create(&productPicture)
+		productPicture := entities.ProductPicture{
+			IDProduk: id,
+			Url:      photo,
+		}
+		if err := tx.Create(&productPicture).Error; err != nil {
+			tx.Rollback()
+			return false, err
+		}
 	}
 
 	tx.Commit()
-
 	return true, nil
 }
 
 func (repository *productRepositoryImpl) Destroy(id uint) (bool, error) {
-	var product entities.Product
-	err := repository.database.Where("id = ?", id).Delete(&product).Error
-
+	err := repository.database.Where("id = ?", id).Delete(&entities.Product{}).Error
 	if err != nil {
 		return false, err
 	}
-
 	return true, nil
 }
