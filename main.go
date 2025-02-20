@@ -46,7 +46,9 @@ func main() {
 	fmt.Println("Available tables:", tables)
 
 	// Setup Migration
-	migration.Migration(database)
+	if err := migration.AutoMigrate(database); err != nil {
+		log.Fatal(err)
+	}
 
 	// In your main function or init DB function
 	database.AutoMigrate(

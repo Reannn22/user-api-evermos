@@ -6,16 +6,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func Migration(database *gorm.DB) {
-	database.AutoMigrate(
+// Export AutoMigrate function
+func AutoMigrate(db *gorm.DB) error {
+	return db.AutoMigrate(
+		&entities.Address{},
 		&entities.User{},
 		&entities.Store{},
 		&entities.Category{},
 		&entities.Product{},
 		&entities.ProductPicture{},
-		&entities.ProductLog{},
-		&entities.Address{},
 		&entities.Trx{},
 		&entities.TrxDetail{},
+		&entities.ProductLog{},
 	)
 }
