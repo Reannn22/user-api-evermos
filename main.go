@@ -73,6 +73,7 @@ func main() {
 	productPictureRepository := repositories.NewProductPictureRepository(database)
 	transactionRepository := repositories.NewTransactionRepository(database)
 	productLogRepository := repositories.NewProductLogRepository(database)
+	fotoProdukRepository := repositories.NewFotoProdukRepository(database)
 
 	// Setup Service
 	authService := services.NewAuthService(&authRepository, &userRepository)
@@ -84,6 +85,7 @@ func main() {
 	productService := services.NewProductService(&productRepository, &storeRepository, &productPictureRepository, &categoryRepository) // Updated this line
 	transactionService := services.NewTransactionService(&transactionRepository, &productRepository, &addressRepository)
 	productLogService := services.NewProductLogService(&productLogRepository)
+	fotoProdukService := services.NewFotoProdukService(&fotoProdukRepository, &productRepository)
 
 	// Setup Handler
 	authHandler := handlers.NewAuthHandler(&authService)
@@ -95,6 +97,7 @@ func main() {
 	productHandler := handlers.NewProductHandler(&productService)
 	transactionHandler := handlers.NewTransactionHandler(&transactionService)
 	productLogHandler := handlers.NewProductLogHandler(&productLogService)
+	fotoProdukHandler := handlers.NewFotoProdukHandler(&fotoProdukService)
 
 	// Setup Fiber
 	app := fiber.New(configs.NewFiberConfig())
@@ -131,6 +134,7 @@ func main() {
 	productHandler.Route(app)
 	transactionHandler.Route(app)
 	productLogHandler.Route(app)
+	fotoProdukHandler.Route(app)
 
 	//Not Found in Last
 	app.Use(func(c *fiber.Ctx) error {
