@@ -220,7 +220,8 @@ func (h *FotoProdukHandler) Delete(c *fiber.Ctx) error {
 		})
 	}
 
-	err = h.service.Delete(uint(id), uint(claims.UserId))
+	// Get the deleted photo data
+	deletedPhoto, err := h.service.Delete(uint(id), uint(claims.UserId))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(responder.ApiResponse{
 			Status:  false,
@@ -234,6 +235,6 @@ func (h *FotoProdukHandler) Delete(c *fiber.Ctx) error {
 		Status:  true,
 		Message: "Success delete photo",
 		Error:   nil,
-		Data:    nil,
+		Data:    deletedPhoto,
 	})
 }

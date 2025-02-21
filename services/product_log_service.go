@@ -30,6 +30,7 @@ func (service *productLogServiceImpl) Create(input models.ProductLogProcess) (mo
 	}
 
 	response := models.ProductLogResponse{
+		ID:            productLog.ID,
 		ProductID:     productLog.IDProduk,
 		NamaProduk:    productLog.NamaProduk,
 		Slug:          productLog.Slug,
@@ -77,6 +78,7 @@ func (service *productLogServiceImpl) GetById(id uint) (models.ProductLogRespons
 	}
 
 	response := models.ProductLogResponse{
+		ID:            productLog.ID,
 		ProductID:     productLog.IDProduk,
 		NamaProduk:    productLog.NamaProduk,
 		Slug:          productLog.Slug,

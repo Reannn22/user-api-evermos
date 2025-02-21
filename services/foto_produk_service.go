@@ -11,7 +11,7 @@ type FotoProdukService interface {
 	GetByProductId(productId uint) ([]models.FotoProdukResponse, error)
 	Create(input models.FotoProdukRequest, userId uint) (models.FotoProdukResponse, error)
 	Update(id uint, input models.FotoProdukRequest, userId uint) (models.FotoProdukResponse, error)
-	Delete(id uint, userId uint) error
+	Delete(id uint, userId uint) (models.FotoProdukResponse, error)
 }
 
 type fotoProdukServiceImpl struct {
@@ -132,13 +132,24 @@ func (s *fotoProdukServiceImpl) Create(input models.FotoProdukRequest, userId ui
 }
 
 func (s *fotoProdukServiceImpl) Update(id uint, input models.FotoProdukRequest, userId uint) (models.FotoProdukResponse, error) {
+	// If PhotoID is provided, verify it exists
+	var targetID uint = id
+	if input.PhotoID > 0 {
+		targetID = input.PhotoID
+		// Verify the target photo exists
+		_, err := s.repository.FindById(targetID)
+		if err != nil {
+			return models.FotoProdukResponse{}, err
+		}
+	}
+
 	// Verify product exists
 	_, err := s.prodRepository.FindById(input.ProductID)
 	if err != nil {
 		return models.FotoProdukResponse{}, err
 	}
 
-	photo, err := s.repository.Update(id, input)
+	photo, err := s.repository.Update(targetID, input)
 	if err != nil {
 		return models.FotoProdukResponse{}, err
 	}
@@ -153,18 +164,32 @@ func (s *fotoProdukServiceImpl) Update(id uint, input models.FotoProdukRequest, 
 	}, nil
 }
 
-func (s *fotoProdukServiceImpl) Delete(id uint, userId uint) error {
+func (s *fotoProdukServiceImpl) Delete(id uint, userId uint) (models.FotoProdukResponse, error) {
 	// First get the photo to check product ownership
 	photo, err := s.repository.FindById(id)
 	if err != nil {
-		return err
+		return models.FotoProdukResponse{}, err
 	}
 
 	// Verify product exists and belongs to user
 	_, err = s.prodRepository.FindById(photo.IDProduk)
 	if err != nil {
-		return err
+		return models.FotoProdukResponse{}, err
 	}
 
-	return s.repository.Delete(id)
+	// Delete the photo
+	err = s.repository.Delete(id)
+	if err != nil {
+		return models.FotoProdukResponse{}, err
+	}
+
+	// Return the deleted photo data
+	return models.FotoProdukResponse{
+		ID:        photo.ID,
+		ProductID: photo.IDProduk,
+		PhotoID:   photo.PhotoID,
+		URL:       photo.Url,
+		CreatedAt: *photo.CreatedAt,
+		UpdatedAt: *photo.UpdatedAt,
+	}, nil
 }

@@ -59,17 +59,26 @@ func (r *fotoProdukRepositoryImpl) Create(foto models.FotoProdukRequest) (entiti
 func (r *fotoProdukRepositoryImpl) Update(id uint, foto models.FotoProdukRequest) (entities.FotoProduk, error) {
 	var photo entities.FotoProduk
 
-	// First find the existing photo
-	err := r.db.First(&photo, id).Error
+	// If PhotoID is provided and different from id parameter, update that photo instead
+	targetID := id
+	if foto.PhotoID > 0 {
+		targetID = foto.PhotoID
+	}
+
+	// Find the photo to update
+	err := r.db.First(&photo, targetID).Error
 	if err != nil {
 		return entities.FotoProduk{}, err
 	}
 
-	// Update the fields
+	// Update fields
 	now := time.Now()
 	photo.Url = foto.URL
-	photo.PhotoID = foto.PhotoID // Add this line to update PhotoID
 	photo.UpdatedAt = &now
+
+	if foto.ProductID > 0 {
+		photo.IDProduk = foto.ProductID
+	}
 
 	err = r.db.Save(&photo).Error
 	if err != nil {

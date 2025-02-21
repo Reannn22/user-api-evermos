@@ -17,6 +17,7 @@ type ProductLogProcess struct {
 }
 
 type ProductLogResponse struct {
+	ID            uint      `json:"id"`
 	ProductID     uint      `json:"product_id"`
 	NamaProduk    string    `json:"nama_produk"`
 	Slug          string    `json:"slug"`
